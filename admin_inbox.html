@@ -29,7 +29,7 @@
     async function loadInbox() {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, body, created_at, customers(full_name, phone)")
+        .select("id, body, created_at, customers:customers!messages_customer_id_fkey(full_name, phone)")
         .order("created_at", { ascending: false })
         .limit(100);
 
