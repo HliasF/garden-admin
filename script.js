@@ -755,3 +755,91 @@ lightbox?.addEventListener('click', (e)=>{ if(e.target === lightbox) lightbox.hi
   // initial render
   renderReviews();
 })();
+// ====== SUPABASE CONTACT FORM HANDLER ======
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const BUCKET = "admin_view_photos"; // το bucket σου
+
+async function getOrCreateCustomer(full_name, phone) {
+  // 1) βρίσκουμε με βάση το phone (unique)
+  const { data: found, error: e1 } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("phone", phone)
+    .limit(1);
+
+  if (e1) throw e1;
+  if (found && found.length) return found[0].id;
+
+  // 2) αλλιώς δημιουργούμε
+  const { data: created, error: e2 } = await supabase
+    .from("customers")
+    .insert({ full_name, phone })
+    .select("id")
+    .single();
+
+  if (e2) throw e2;
+  return created.id;
+}
+
+async function uploadFiles(customer_id, files) {
+  const uploadedPaths = [];
+
+  for (const file of files) {
+    const safe = file.name.replace(/\s+/g, "_");
+    const path = `${customer_id}/${Date.now()}_${safe}`;
+
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file);
+    if (upErr) throw upErr;
+
+    uploadedPaths.push(path);
+
+    const { error: dbErr } = await supabase
+      .from("garden_photos")
+      .insert({ customer_id, file_path: path });
+
+    if (dbErr) throw dbErr;
+  }
+
+  return uploadedPaths;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("contactForm");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const full_name = form.elements["name"].value.trim();
+    const phone = form.elements["phone"].value.trim();
+    const body = form.elements["message"].value.trim();
+    const files = document.getElementById("gardenFiles")?.files || [];
+
+    if (!full_name || !phone || !body) {
+      alert("Συμπλήρωσε Ονοματεπώνυμο, Τηλέφωνο και Μήνυμα.");
+      return;
+    }
+
+    try {
+      const customer_id = await getOrCreateCustomer(full_name, phone);
+
+      const { error: msgErr } = await supabase
+        .from("messages")
+        .insert({ customer_id, body });
+
+      if (msgErr) throw msgErr;
+
+      if (files.length > 0) {
+        await uploadFiles(customer_id, files);
+      }
+
+      alert("Στάλθηκε ✅");
+      form.reset();
+    } catch (err) {
+      alert("Σφάλμα: " + (err?.message || err));
+    }
+  });
+});
+
