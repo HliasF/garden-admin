@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="el">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Inbox</title></head>
+<body>
+  <h2>Admin Inbox</h2>
+  <p><a href="/admin.html">Φωτογραφίες</a> | <a href="/admin_reviews.html">Κριτικές</a></p>
+
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button id="loginBtn">Login</button>
+
+  <hr>
+  <div id="list"></div>
+
+  <script src="/config.js"></script>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+    const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return alert(error.message);
+      loadInbox();
+    });
+
+    async function loadInbox() {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("id, body, created_at, customers(full_name, phone)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) return alert(error.message);
+
+      const box = document.getElementById("list");
+      box.innerHTML = "";
+
+      data.forEach(m => {
+        const div = document.createElement("div");
+        div.style.border = "1px solid #ccc";
+        div.style.padding = "10px";
+        div.style.margin = "10px 0";
+        div.innerHTML = `
+          <strong>${m.customers?.full_name || "—"}</strong> (${m.customers?.phone || "—"})<br>
+          <small>${new Date(m.created_at).toLocaleString()}</small>
+          <p>${m.body}</p>
+        `;
+        box.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>
