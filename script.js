@@ -842,4 +842,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+document.addEventListener("DOMContentLoaded", () => {
+  const reviewForm = document.getElementById("reviewForm");
+  if (!reviewForm) return;
+
+  let ratingValue = 0;
+  const stars = document.querySelectorAll(".star");
+  stars.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ratingValue = Number(btn.dataset.value || 0);
+      stars.forEach((s, i) => (s.textContent = i < ratingValue ? "★" : "☆"));
+    });
+  });
+
+  reviewForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = reviewForm.elements["rname"].value.trim();
+    const text = reviewForm.elements["rtext"].value.trim();
+
+    if (!name || !text || ratingValue < 1) {
+      alert("Βάλε όνομα, κριτική και βαθμολογία.");
+      return;
+    }
+
+    const { error } = await supabase.from("reviews").insert({
+      name,
+      rating: ratingValue,
+      text,
+      approved: false
+    });
+
+    if (error) return alert(error.message);
+
+    alert("Η κριτική υποβλήθηκε ✅ (θα εμφανιστεί μετά από έγκριση)");
+    reviewForm.reset();
+    ratingValue = 0;
+    stars.forEach((s) => (s.textContent = "☆"));
+  });
+});
+
 
